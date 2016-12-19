@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: bezrukovp
+  description: Docker role of Ubuntu server
+  company:
+  license: MIT
+  min_ansible_version: 1.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - precise
+        - trusty
+        - wily
+        - xenial
+  galaxy_tags:
+    - system
+dependencies:
+    - bezrukovp.common
