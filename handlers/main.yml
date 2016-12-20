@@ -1,12 +1,16 @@
 ---
 - name: docker start
   service: name=docker state=started
+  become: yes
 
 - name: docker stop
   service: name=docker state=stoped
+  become: yes
 
 - name: docker restart
   service: name=docker state=restarted
+  become: yes
 
 - name: docker reload
   service: name=docker state=reloaded
+  become: yes
