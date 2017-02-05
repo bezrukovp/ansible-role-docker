@@ -31,24 +31,28 @@
 - name: For Ubuntu Trusty, Wily, and Xenial, install the linux-image-extra-* kernel packages, which allows you use the aufs storage driver.
   action: apt pkg="{{item}}" state=present update_cache=yes
   with_items:
-      - "linux-image-extra-{{ ansible_kernel }}"
-      - linux-image-extra-virtual
-  when: " {{ ansible_distribution_version == 16.04 or ansible_distribution_version == 15.10 or ansible_distribution_version == 14.04 }}"
+    - "linux-image-extra-{{ ansible_kernel }}"
+    - linux-image-extra-virtual
+  when:
+    - " {{ ansible_distribution_version == 16.04 or ansible_distribution_version == 15.10 or ansible_distribution_version == 14.04 }}"
+    - docker_with_linux_image
   become: yes
   tags: docker
 
 - name: For Ubuntu Precise, install the linux-image-generic-lts-trusty kernel, which allows you use the aufs storage driver.
   action: apt pkg="{{item}}" state=present update_cache=yes
   with_items:
-      - linux-image-generic-lts-trusty
-  when: " {{ ansible_distribution_version == 12.04 }}"
+    - linux-image-generic-lts-trusty
+  when:
+    - " {{ ansible_distribution_version == 12.04 }}"
+    - docker_with_linux_image
   become: yes
   tags: docker
 
 - name: Install Docker Engine
   apt: name={{item}} state=present update-cache=yes cache_valid_time=864000
   with_items:
-      - docker-engine
+    - docker-engine
   become: yes
   tags: docker
 
@@ -70,33 +74,44 @@
   tags: docker
   register: mtu
 
-- name: Configure docker0 bridge
+- set_fact:
+    docker_opts: "{{ docker_opts }} --bip={{docker_bridge_ip}}/24 --mtu {{mtu.stdout}}"
+  when: docker_bridge_ip
+  tags: docker
+
+- command: lsmod | grep -c overlay
+  register: isOverlay
+  ignore_errors: yes
+  become: yes
+  tags: docker
+
+- set_fact:
+    docker_opts: "{{ docker_opts }} --storage-driver=overlay2"
+  when: isOverlay
+  tags: docker
+
+- set_fact:
+    docker_opts: "{{ docker_opts }} --registry-mirror={{docker_mirror_protocol}}://{{docker_mirror_host}}:{{docker_mirror_port}}"
+  when: docker_mirror_host
+  tags: docker
+
+- name: Configure docker options with upstart
   lineinfile:
     dest: /etc/default/docker
     insertafter: ^#DOCKER_OPTS=.*
-    regexp: "^DOCKER_OPTS=\"(.*)\""
-    line: "DOCKER_OPTS=\"\\1 --bip={{docker_bridge_ip}}/24 --mtu {{mtu.stdout}} \""
-    backrefs: yes
+    regexp: ^DOCKER_OPTS=.*
+    line: "DOCKER_OPTS=\"{{docker_opts}}\""
     state: present
-  when: docker_bridge_ip
+  when: "{{ ansible_distribution_version | version_compare('14.04', '<=') }}"
   become: yes
   tags: docker
   notify:
     - docker restart
 
-- name: Configure registry mirror (if docker_mirror_host is not empty)
-  lineinfile:
-    dest: /etc/default/docker
-    insertafter: ^#DOCKER_OPTS=.*
-    regexp: ^DOCKER_OPTS=\"(.*)\"
-    line: "DOCKER_OPTS=\"\\1 --registry-mirror={{docker_mirror_protocol}}://{{docker_mirror_host}}:{{docker_mirror_port}} \""
-    backrefs: yes
-    state: present
-  when: docker_mirror_host
+- name: Configure docker options with systemd
+  template: src=docker.service.j2 dest=/etc/systemd/system/docker.service.d/docker.conf
+  when: "{{ ansible_distribution_version | version_compare('15.10', '>=') }}"
   become: yes
-  tags: docker
-  notify:
-    - docker restart
 
 - name: Install Docker Compose
   get_url:
