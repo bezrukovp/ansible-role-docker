@@ -1,6 +1,6 @@
 ---
 docker_with_linux_image: no
-docker_opts: "--selinux-enabled -H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock"
+docker_opts: "-H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock --selinux-enabled"
 docker_bridge_ip:
 docker_mirror_host:
 docker_mirror_protocol: "https"

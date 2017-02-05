@@ -79,9 +79,8 @@
   when: docker_bridge_ip
   tags: docker
 
-- command: lsmod | grep -c overlay
+- shell: /sbin/lsmod | grep -c overlay
   register: isOverlay
-  ignore_errors: yes
   become: yes
   tags: docker
 
@@ -108,10 +107,24 @@
   notify:
     - docker restart
 
+- name: Create a directory for docker service systemd
+  file:
+    path: '/etc/systemd/system/docker.service.d'
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  when: "{{ ansible_distribution_version | version_compare('15.10', '>=') }}"
+  become: true
+  tags: docker
+
 - name: Configure docker options with systemd
   template: src=docker.service.j2 dest=/etc/systemd/system/docker.service.d/docker.conf
   when: "{{ ansible_distribution_version | version_compare('15.10', '>=') }}"
   become: yes
+  tags: docker
+  notify:
+    - docker restart
 
 - name: Install Docker Compose
   get_url:
